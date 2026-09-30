@@ -1,0 +1,13 @@
+{
+  "name": "mac-camera-vr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stream a Mac camera to a Quest browser over the local network.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check dist/app.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

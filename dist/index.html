@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080c12" />
+    <meta
+      name="description"
+      content="Macのカメラ映像を同じWi-Fi上のQuestへ低遅延で送るローカルビューアー"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080c12'/%3E%3Cpath d='M12 23a8 8 0 0 1 8-8h24a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H20a8 8 0 0 1-8-8z' fill='%236fe7c8'/%3E%3Ccircle cx='32' cy='32' r='10' fill='%23080c12'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23a8ffe9'/%3E%3C/svg%3E"
+    />
+    <title>Mac Camera VR</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Mac Camera VR ホーム">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>MAC CAMERA <strong>VR</strong></span>
+        </a>
+        <div class="status" id="connectionStatus" data-state="idle">
+          <span class="status-dot"></span>
+          <span id="statusText">待機中</span>
+        </div>
+      </header>
+
+      <section class="route-picker" id="routePicker" hidden>
+        <p class="eyebrow">LOCAL CAMERA RELAY</p>
+        <h1>どちらの端末で開いていますか？</h1>
+        <p class="lede">Macを配信元にし、同じWi-FiのQuestで映像を受け取ります。</p>
+        <div class="route-actions">
+          <a class="button primary" href="/broadcast">Macで配信する</a>
+          <a class="button secondary" href="/viewer">Questで見る</a>
+        </div>
+      </section>
+
+      <section class="camera-workspace" id="cameraPanel" hidden>
+        <div class="camera-stage" id="cameraStage">
+          <canvas id="sphereCanvas" aria-label="360度カメラ映像"></canvas>
+          <video id="cameraVideo" autoplay muted playsinline hidden></video>
+          <div class="camera-overlay" id="cameraEmpty">
+            <p class="eyebrow">INSTA360 X4 · 360 VIEWER</p>
+            <h1>カメラ映像を表示</h1>
+            <p>Webcam ModeのX4を選ぶと、映像を360°で見回せます。</p>
+            <button class="button primary" id="startCamera">カメラを選ぶ</button>
+          </div>
+          <div class="camera-hud"><span id="cameraLiveDot"></span><span id="cameraHudText">待機中</span></div>
+          <div class="camera-help">ドラッグ / スワイプ：視点移動　・　ホイール / ピンチ：ズーム</div>
+        </div>
+        <aside class="control-panel camera-panel">
+          <p class="eyebrow">CAMERA DIAGNOSTICS</p>
+          <h2>360°ビューアー</h2>
+          <label class="field-label" for="cameraSelect">カメラ</label>
+          <select id="cameraSelect" class="camera-select"><option>未選択</option></select>
+          <button class="button primary full" id="startSelectedCamera">接続する</button>
+          <button class="button secondary full" id="cameraFullscreen">全画面で見る</button>
+          <dl class="diagnostics">
+            <div><dt>状態</dt><dd id="diagState">未接続</dd></div>
+            <div><dt>実際の解像度</dt><dd id="diagResolution">—</dd></div>
+            <div><dt>フレームレート</dt><dd id="diagFrameRate">—</dd></div>
+            <div><dt>映像形式</dt><dd id="diagFormat">—</dd></div>
+          </dl>
+          <p class="hint" id="cameraHint">X4本体で「Webcam Mode」を選択してから接続してください。</p>
+        </aside>
+      </section>
+
+      <section class="workspace" id="broadcastPanel" hidden>
+        <div class="video-stage broadcaster-stage">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="remote-cursor" id="remoteCursor" hidden aria-hidden="true">
+            <span class="cursor-core"></span>
+            <span class="cursor-label">QUEST</span>
+          </div>
+          <div class="empty-state" id="broadcastEmpty">
+            <span class="camera-icon" aria-hidden="true"></span>
+            <h1>X4の360°映像を配信</h1>
+            <p>Insta360 X4をWebcam Modeにして選択してください。2880×1440を優先してQuestへ送ります。</p>
+            <label class="field-label" for="broadcastCameraSelect">配信カメラ</label>
+            <select id="broadcastCameraSelect" class="camera-select"><option value="">自動選択（Insta360優先）</option></select>
+            <button class="button primary" id="startBroadcast">カメラを開始</button>
+          </div>
+          <div class="video-badge">MAC · LIVE SOURCE</div>
+        </div>
+        <aside class="control-panel">
+          <p class="eyebrow">BROADCAST</p>
+          <h2>Questを待っています</h2>
+          <p class="muted">このページをMacで開いたままにしてください。</p>
+          <div class="metric">
+            <span>接続中のビューアー</span>
+            <strong id="viewerCount">0</strong>
+          </div>
+          <div class="controller-readout" id="macControllerReadout" data-active="false">
+            <div>
+              <span class="readout-label">QUEST INPUT</span>
+              <strong id="macControllerState">未接続</strong>
+            </div>
+            <div class="button-lamps" aria-label="受信したボタン状態">
+              <span id="lampTrigger">TRG</span>
+              <span id="lampPrimary">A/X</span>
+              <span id="lampSecondary">B/Y</span>
+            </div>
+          </div>
+          <div class="address-card">
+            <span>Questで開くURL</span>
+            <code id="viewerUrl">IPアドレスを確認中…</code>
+          </div>
+          <button class="button secondary full" id="copyUrl">URLをコピー</button>
+          <p class="hint">MacとQuestを同じWi-Fiに接続してください。</p>
+        </aside>
+      </section>
+
+      <section class="workspace viewer-workspace" id="viewerPanel" hidden>
+        <div class="video-stage viewer-stage" id="viewerStage">
+          <canvas id="xrCanvas" class="xr-canvas" aria-hidden="true"></canvas>
+          <div class="mono-view" id="monoView">
+            <video id="remoteVideo" autoplay muted playsinline></video>
+          </div>
+          <div class="stereo-view" id="stereoView" hidden>
+            <video id="leftEye" autoplay muted playsinline></video>
+            <video id="rightEye" autoplay muted playsinline></video>
+          </div>
+          <div class="empty-state" id="viewerEmpty">
+            <span class="headset-icon" aria-hidden="true"></span>
+            <h1>Macの映像を見る</h1>
+            <p>先にMac側で「カメラを開始」を押してください。</p>
+            <button class="button primary" id="connectViewer">接続する</button>
+          </div>
+          <div class="video-badge">QUEST · REMOTE VIEW</div>
+        </div>
+        <aside class="control-panel compact">
+          <p class="eyebrow">QUEST CONTROL</p>
+          <h2>Macを操作</h2>
+          <div class="controller-status" id="questControllerStatus" data-active="false">
+            <span class="status-dot"></span>
+            <span id="questControllerText">映像に接続してください</span>
+          </div>
+          <div class="control-pad" id="controlPad" tabindex="0" aria-label="Macカーソル操作パッド">
+            <span class="pad-cross" aria-hidden="true"></span>
+            <span class="pad-copy">ここをコントローラーで<br />ポイント</span>
+          </div>
+          <div class="quest-buttons" aria-label="操作ボタン">
+            <button class="quest-button" data-quest-button="primary">A / X</button>
+            <button class="quest-button trigger" data-quest-button="trigger">TRIGGER</button>
+            <button class="quest-button" data-quest-button="secondary">B / Y</button>
+          </div>
+          <p class="hint compact-hint">コントローラーのレーザーでパッドを指し、トリガーを押すとMacへ送信されます。</p>
+          <div class="panel-divider"></div>
+          <p class="eyebrow">VIEW MODE</p>
+          <button class="button primary full" id="enterVrButton" disabled>映像接続後にVRへ入る</button>
+          <p class="hint compact-hint" id="webxrHint">WebXR対応を確認中…</p>
+          <div class="segmented" role="group" aria-label="表示モード">
+            <button class="segment active" id="monoButton" aria-pressed="true">通常</button>
+            <button class="segment" id="stereoButton" aria-pressed="false">左右分割</button>
+          </div>
+          <button class="button primary full" id="fullscreenButton">全画面で見る</button>
+          <button class="button secondary full" id="reconnectButton" hidden>再接続</button>
+          <p class="hint compact-hint">左右分割は同じ映像を両眼向けに並べる簡易VR表示です。</p>
+        </aside>
+      </section>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
